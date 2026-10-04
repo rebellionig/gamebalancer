@@ -1,0 +1,27 @@
+flowchart TB
+    U([Пользователь / CLI]) --> O
+
+    subgraph LOOP[Цикл балансировки, макс. N итераций и T секунд]
+        O["Оркестратор<br/>только планирует"]
+        D["Дизайнер<br/>LLM"]
+        C["Критик<br/>LLM + сценарии"]
+        S["Симулятор<br/>код, батч матчей"]
+        A["Аналитик<br/>статистика"]
+        O -- "1 цель + SimResult" --> D
+        D -- "2 ChangeProposal" --> C
+        C -- "3 CritiqueReport (ok / reject)" --> O
+        O -- "4 одобренная правка" --> S
+        S -- "5 SimResult" --> A
+        A -- "6 AnalysisReport" --> O
+    end
+
+    O --> R["Репортёр<br/>LLM"]
+    R --> OUT([report.md + patch notes])
+
+    S --- ENG[("Движок игры<br/>balance.json")]
+    A --- DB[("SQLite<br/>состояние задачи")]
+    O --- DB
+    LOG[["logs/run.jsonl<br/>каждый вызов агента, LLM и инструмента"]]
+    D -.-> LOG
+    S -.-> LOG
+    C -.-> LOG
