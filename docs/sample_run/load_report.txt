@@ -1,0 +1,5 @@
+всего вызовов LLM+инструментов: 12
+  simulator       4   33.3%
+  analyst         4   33.3%
+  critic          3   25.0%
+  reporter        1    8.3%
