@@ -43,3 +43,9 @@ def test_message_schema_validation():
         ChangeProposal(iteration=1, changes=[], rationale="пусто")  # нужна минимум 1 правка
     p = ChangeProposal(iteration=1, changes=[Change(unit="mage", param="atk", **{"from": 4}, to=3)], rationale="x")
     assert p.changes[0].to == 3
+
+
+def test_sides_are_symmetric_with_random_first_move():
+    # без случайного порядка хода сторона A выигрывала ~40%; теперь должна быть около 50%
+    r = run_batch(BALANCE, 2000, seed=7)
+    assert 0.45 <= r["side_winrate"]["A"] <= 0.55

@@ -1,0 +1,5 @@
+{
+  "warrior": {"hp": 10, "atk": 3, "move": 2, "range": 1},
+  "archer":  {"hp": 7,  "atk": 6, "move": 2, "range": 3},
+  "mage":    {"hp": 4,  "atk": 4, "move": 1, "range": 2}
+}

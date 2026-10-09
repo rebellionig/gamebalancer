@@ -99,10 +99,15 @@ def _act(unit: Unit, units: list[Unit], bot: str, rng: random.Random) -> None:
 
 
 def play_match(balance: dict, comp_a: list[str], comp_b: list[str],
-               bot_a: str, bot_b: str, rng: random.Random) -> dict:
+               bot_a: str, bot_b: str, rng: random.Random, first: str = "A") -> dict:
+    """`first` - какая сторона ходит первой. Второй ход даёт преимущество (можно дождаться
+    подхода врага и бить первым), поэтому run_batch выбирает `first` случайно."""
     units = _spawn("A", comp_a, balance) + _spawn("B", comp_b, balance)
+    order = [("A", bot_a), ("B", bot_b)]
+    if first == "B":
+        order.reverse()
     for turn in range(1, MAX_TURNS + 1):
-        for side, bot in (("A", bot_a), ("B", bot_b)):
+        for side, bot in order:
             for u in [u for u in units if u.side == side and u.alive]:
                 if u.alive:
                     _act(u, units, bot, rng)
@@ -128,7 +133,8 @@ def run_batch(balance: dict, n_matches: int, seed: int) -> dict:
         comp_a = [rng.choice(UNIT_TYPES) for _ in range(3)]
         comp_b = [rng.choice(UNIT_TYPES) for _ in range(3)]
         bot_a, bot_b = rng.choice(BOTS), rng.choice(BOTS)
-        res = play_match(balance, comp_a, comp_b, bot_a, bot_b, rng)
+        first = rng.choice(("A", "B"))  # случайный порядок хода убирает перекос сторон
+        res = play_match(balance, comp_a, comp_b, bot_a, bot_b, rng, first=first)
         wins[res["winner"]] += 1
         turns_total += res["turns"]
         for side, comp in (("A", comp_a), ("B", comp_b)):
@@ -144,3 +150,16 @@ def run_batch(balance: dict, n_matches: int, seed: int) -> dict:
         "unit_winrate": {k: round(unit_wins[k] / max(unit_games[k], 1), 4) for k in UNIT_TYPES},
         "avg_turns": round(turns_total / n_matches, 2),
     }
+
+
+def run_matchup(balance: dict, kind_a: str, kind_b: str, n_matches: int, seed: int) -> float:
+    """Винрейт команды из 3 юнитов kind_a против команды из 3 юнитов kind_b (ничья = 0.5).
+    Нужен Критику: массовые «чистые» матчи вскрывают жёсткие контры и доминирующие стратегии."""
+    rng = random.Random(seed)
+    score = 0.0
+    for _ in range(n_matches):
+        bot_a, bot_b = rng.choice(BOTS), rng.choice(BOTS)
+        res = play_match(balance, [kind_a] * 3, [kind_b] * 3, bot_a, bot_b, rng,
+                         first=rng.choice(("A", "B")))
+        score += 1.0 if res["winner"] == "A" else 0.5 if res["winner"] == "draw" else 0.0
+    return round(score / n_matches, 4)
