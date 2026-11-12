@@ -18,6 +18,8 @@ NAME = "analyst"
 TOL = 0.05    # допустимое отклонение от 50% (диапазон 45-55%)
 Z_MIN = 2.0   # ~95% уверенность, что отклонение не шум
 SIDE_TOL = 0.05
+PURE_TOL = 0.20   # средний винрейт юнита в чистых матчах: допуск шире (составы нереалистичны), но 0%/100% ловятся
+PURE_Z_MIN = 3.0
 
 
 class Analyst:
@@ -34,6 +36,17 @@ class Analyst:
             findings.append(Finding(metric=f"unit:{unit}", winrate=wr, deviation=round(dev, 4),
                                     z=round(z, 2), verdict=verdict))
 
+        # второй взгляд: чистые матчи. Находит юнит, чей эффект тонет в смешанных составах (напр. воин с atk 1)
+        # только если командные метрики чисты: иначе чистые матчи показывают следствия того же перекоса (лучник
+        # давит всех -> «слабым» выглядит воин), и Дизайнер начал бы лечить следствие вместо причины
+        team_off = any(f.verdict != "ok" for f in findings)
+        for unit, wr, n in ([] if team_off else self._pure_winrates(result)):
+            dev = wr - 0.5
+            z = dev / math.sqrt(0.25 / n)
+            if abs(dev) > PURE_TOL and abs(z) >= PURE_Z_MIN:
+                findings.append(Finding(metric=f"pure:{unit}", winrate=round(wr, 4), deviation=round(dev, 4),
+                                        z=round(z, 2), verdict="overpowered" if dev > 0 else "underpowered"))
+
         off_findings = [f for f in findings if f.verdict != "ok"]
         worst = max(off_findings, key=lambda f: abs(f.z)).metric if off_findings else None
 
@@ -46,3 +59,13 @@ class Analyst:
         return AnalysisReport(iteration=result.iteration, n_matches=result.n_matches,
                               balanced=not off_findings, findings=findings,
                               worst=worst, side_warning=side_warning)
+
+    @staticmethod
+    def _pure_winrates(result: SimResult):
+        """(юнит, средний винрейт против двух других типов, число матчей). Пусто, если матрицы нет."""
+        wins: dict[str, list[float]] = {}
+        for pair, v in result.matchups.items():
+            a, b = pair.split(">")
+            wins.setdefault(a, []).append(v)
+            wins.setdefault(b, []).append(1 - v)
+        return [(u, sum(v) / len(v), result.pure_n * len(v)) for u, v in wins.items()]

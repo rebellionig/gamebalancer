@@ -20,6 +20,7 @@ from logger import log_event
 DEFAULT_BASE_URL = "https://api.groq.com/openai/v1"
 RETRIES = 2
 TIMEOUT_S = 30
+FATAL_HTTP = (400, 401, 403, 404)  # не ретраим; 429 и 5xx ретраим
 
 
 def load_env(path: str = ".env") -> None:
@@ -31,7 +32,7 @@ def load_env(path: str = ".env") -> None:
         line = line.strip()
         if line and not line.startswith("#") and "=" in line:
             k, v = line.split("=", 1)
-            os.environ.setdefault(k.strip(), v.strip())
+            os.environ.setdefault(k.strip(), v.strip().strip(chr(34) + chr(39)))
 
 
 class LLMError(RuntimeError):
@@ -59,7 +60,9 @@ class LLMClient:
         }).encode()
         req = urllib.request.Request(
             f"{self.base_url}/chat/completions", data=body, method="POST",
-            headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.key}"},
+            # явный User-Agent: Groq стоит за Cloudflare, который отдаёт 403 на стандартный "Python-urllib"
+            headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.key}",
+                     "User-Agent": "game-balancer/1.0", "Accept": "application/json"},
         )
         last = None
         for attempt in range(1, RETRIES + 2):
@@ -72,6 +75,11 @@ class LLMClient:
                 return text
             except (urllib.error.URLError, TimeoutError, KeyError, json.JSONDecodeError) as e:
                 last = e
+                code = getattr(e, "code", None)
+                if code in FATAL_HTTP:  # ключ/запрос неверны: повтор бессмысленен и только раздувает число вызовов
+                    log_event(self.agent, "llm", "chat", {"model": self.model, "attempt": attempt}, None,
+                              ok=False, error=repr(e), duration_ms=(time.perf_counter() - t0) * 1000)
+                    raise LLMError(f"LLM отклонил запрос (HTTP {code}), повтор не поможет: проверь ключ, модель и URL") from e
                 log_event(self.agent, "llm", "chat", {"model": self.model, "attempt": attempt}, None,
                           ok=False, error=repr(e), duration_ms=(time.perf_counter() - t0) * 1000)
                 time.sleep(1.0 * attempt)

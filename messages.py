@@ -34,6 +34,8 @@ class SimResult(BaseModel):
     draw_rate: float
     unit_winrate: dict[str, float]
     avg_turns: float
+    pure_n: int = 0                   # матчей на каждую пару в matchups
+    matchups: dict[str, float] = {}   # «чистые» матчи 3 vs 3 одного типа: "warrior>archer" -> винрейт первого
 
 
 class Finding(BaseModel):

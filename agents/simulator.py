@@ -4,15 +4,17 @@ LLM не использует. Один вызов = один батч (инач
 """
 from __future__ import annotations
 
+import itertools
 import time
 
 from game import balance as bal
-from game.engine import run_batch
+from game.engine import UNIT_TYPES, run_batch, run_matchup
 from logger import log_event, logged
 from messages import ChangeProposal, SimResult
 
 NAME = "simulator"
 RETRIES = 2
+PURE_N = 150  # матчей на каждую пару «чистых» составов
 
 
 class Simulator:
@@ -37,6 +39,12 @@ class Simulator:
         log_event(NAME, "agent", "run", proposal.model_dump(by_alias=True), result.model_dump())
         return result, new_balance
 
-    @logged(NAME, "tool", "engine.run_batch")
+    @logged(NAME, "tool", "engine.simulate")
     def _engine(self, balance: dict, n_matches: int, seed: int) -> dict:
-        return run_batch(balance, n_matches, seed)
+        """ОДИН вызов инструмента: смешанный батч + матрица чистых матчей (чтобы не раздувать долю Симулятора).
+        Чистые матчи вскрывают юнит, который проигрывает/выигрывает у всех, что размыто в смешанных составах."""
+        stats = run_batch(balance, n_matches, seed)
+        stats["pure_n"] = PURE_N
+        stats["matchups"] = {f"{a}>{b}": run_matchup(balance, a, b, PURE_N, seed)
+                             for a, b in itertools.combinations(UNIT_TYPES, 2)}
+        return stats

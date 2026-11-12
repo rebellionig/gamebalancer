@@ -36,3 +36,25 @@ def test_side_warning():
     res = sim(1000)
     res.side_winrate = {"A": 0.38, "B": 0.62}
     assert "Перекос" in Analyst().analyze(res).side_warning
+
+
+def test_pure_matchups_catch_useless_unit():
+    # командная метрика чиста, но воин проигрывает всем в чистых матчах -> реальный дисбаланс
+    res = sim(1000)
+    res.pure_n, res.matchups = 150, {"warrior>archer": 0.0, "warrior>mage": 0.0, "archer>mage": 0.5}
+    r = Analyst().analyze(res)
+    assert not r.balanced and r.worst == "pure:warrior"
+    assert {f.metric: f.verdict for f in r.findings}["pure:warrior"] == "underpowered"
+
+
+def test_pure_matchups_ignore_normal_spread():
+    res = sim(1000)
+    res.pure_n, res.matchups = 150, {"warrior>archer": 0.55, "warrior>mage": 0.60, "archer>mage": 0.52}
+    assert Analyst().analyze(res).balanced
+
+
+def test_pure_matchups_do_not_mask_team_finding():
+    # если командная метрика уже нашла виновника, чистые матчи не добавляют следствий
+    res = sim(1000, archer=0.65)
+    res.pure_n, res.matchups = 150, {"warrior>archer": 0.0, "warrior>mage": 0.5, "archer>mage": 1.0}
+    assert Analyst().analyze(res).worst == "unit:archer"
