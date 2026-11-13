@@ -1,0 +1,6 @@
+всего вызовов LLM+инструментов: 10
+  designer        2   20.0%
+  critic          2   20.0%
+  simulator       2   20.0%
+  analyst         2   20.0%
+  reporter        2   20.0%
