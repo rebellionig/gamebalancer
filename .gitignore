@@ -3,3 +3,4 @@ logs/
 state/
 __pycache__/
 .pytest_cache/
+reports/
